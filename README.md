@@ -32,11 +32,6 @@
 
 ---
 
-## Live Demo
-
-https://github.com/user-attachments/assets/1327bdc8-4b8e-4e5f-a184-aef0d51ac3ec
-
----
 
 ## TL;DR — Get Running in 3 Steps
 

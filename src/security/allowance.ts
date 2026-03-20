@@ -88,16 +88,26 @@ async function getWorkingProvider(chainId: number): Promise<{ provider: JsonRpcP
  * Approves USDC for both ConditionalTokens and Exchange contracts
  */
 export async function approveUSDCAllowance(): Promise<void> {
-    const privateKey = config.requirePrivateKey();
+    // In proxy mode, the funder is NOT the signer derived from PRIVATE_KEY.
+    // The existing on-chain approval flow would approve the signer wallet,
+    // which is wrong for proxy-funded orders.
+    if (config.useProxyWallet) {
+      logger.info(
+        `USE_PROXY_WALLET=true -> skipping on-chain signer approvals. ` +
+        `Proxy funder (${config.proxyWalletAddress}) must already have Exchange/CTF approvals ` +
+        `via Polymarket UI or a proper gasless/relayer flow.`
+      );
+      return;
+    }
 
+    const privateKey = config.requirePrivateKey();
     const chainId = (config.chainId || Chain.POLYGON) as Chain;
     const contractConfig = getContractConfig(chainId);
-    
-    // Get RPC URL and create provider
+
     const { provider, rpcUrl } = await getWorkingProvider(chainId);
     const wallet = new Wallet(privateKey, provider);
-    
     const address = await wallet.getAddress();
+
     logger.info(`Approving USDC allowances for address: ${address}, chainId: ${chainId}`);
     logger.info(`RPC: ${rpcUrl}`);
     logger.info(`USDC Contract: ${contractConfig.collateral}`);

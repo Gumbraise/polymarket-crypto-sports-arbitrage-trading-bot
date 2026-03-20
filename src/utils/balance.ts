@@ -78,7 +78,7 @@ export async function displayWalletBalance(client: ClobClient): Promise<{ balanc
         logger.info("═══════════════════════════════════════");
         logger.info(`USDC Balance: ${balance.toFixed(6)}`);
         logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);logger.info(
-  `Available: ${available.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
+  `Available: ${balance.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
 );
 if (config.useProxyWallet) {
   logger.info(`Using proxy funder address from CLOB client`);
@@ -191,7 +191,7 @@ export async function waitForMinimumUsdcBalance(
             logger.info("═══════════════════════════════════════");
             logger.info(`USDC Balance: ${balance.toFixed(6)}`);
             logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);logger.info(
-  `Available: ${available.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
+  `Available: ${balance.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
 );
 if (config.useProxyWallet) {
   logger.info(`Using proxy funder address from CLOB client`);

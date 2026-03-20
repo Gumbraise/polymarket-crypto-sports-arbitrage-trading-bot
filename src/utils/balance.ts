@@ -1,5 +1,6 @@
 import { ClobClient, AssetType, type OpenOrder } from "@polymarket/clob-client";
 import { logger } from "./logger";
+import { config } from "../config";
 
 /**
  * Calculate available balance for placing orders

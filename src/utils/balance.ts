@@ -77,8 +77,12 @@ export async function displayWalletBalance(client: ClobClient): Promise<{ balanc
         logger.info("💰 WALLET BALANCE & ALLOWANCE");
         logger.info("═══════════════════════════════════════");
         logger.info(`USDC Balance: ${balance.toFixed(6)}`);
-        logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);
-        logger.info(`Available: ${balance.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`);
+        logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);logger.info(
+  `Available: ${available.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
+);
+if (config.useProxyWallet) {
+  logger.info(`Using proxy funder address from CLOB client`);
+}
         logger.info("═══════════════════════════════════════");
 
         return { balance, allowance };
@@ -186,8 +190,12 @@ export async function waitForMinimumUsdcBalance(
             logger.info("💰 WALLET BALANCE & ALLOWANCE");
             logger.info("═══════════════════════════════════════");
             logger.info(`USDC Balance: ${balance.toFixed(6)}`);
-            logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);
-            logger.info(`Available: ${balance.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`);
+            logger.info(`USDC Allowance: ${allowance.toFixed(6)}`);logger.info(
+  `Available: ${available.toFixed(6)} (Balance: ${balance.toFixed(6)}, Allowance: ${allowance.toFixed(6)})`
+);
+if (config.useProxyWallet) {
+  logger.info(`Using proxy funder address from CLOB client`);
+}
             logger.info("═══════════════════════════════════════");
 
             const ok = available >= minimumUsd;

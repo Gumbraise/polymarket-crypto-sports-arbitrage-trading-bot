@@ -157,6 +157,7 @@ export class CopytradeArbBot {
     private pricePredictors: Map<string, AdaptivePricePredictor> = new Map(); // Price predictors per market
     private lastPredictions: Map<string, { prediction: PricePrediction; actualPrice: number; timestamp: number }> = new Map(); // Track predictions for accuracy
     private marketStartTimeBySlug: Map<string, number> = new Map(); // Track when each market slug started
+    private orderOptionsByTokenId: Map<string, CreateOrderOptions> = new Map(); // Cache per-token tickSize/negRisk
 
     // Limit order second side strategy tracking
     private tokenCountsByMarket: Map<string, { upTokenCount: number; downTokenCount: number }> = new Map(); // Track token counts per market
@@ -259,6 +260,36 @@ export class CopytradeArbBot {
         setInterval(() => {
             this.checkAndHandleMarketCycleChanges();
         }, 10 * 1000); // Check every 10 seconds
+    }
+
+    private async resolveOrderOptions(tokenID: string): Promise<CreateOrderOptions> {
+        const cached = this.orderOptionsByTokenId.get(tokenID);
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const [tickSize, negRisk] = await Promise.all([
+                this.client.getTickSize(tokenID),
+                this.client.getNegRisk(tokenID),
+            ]);
+
+            const resolved: CreateOrderOptions = {
+                tickSize: tickSize as CreateOrderOptions["tickSize"],
+                negRisk,
+            };
+            this.orderOptionsByTokenId.set(tokenID, resolved);
+            logger.info(
+                `Resolved order options for ${tokenID.substring(0, 10)}... tickSize=${resolved.tickSize} negRisk=${resolved.negRisk}`
+            );
+            return resolved;
+        } catch (error) {
+            logger.error(
+                `Failed to resolve order options for ${tokenID.substring(0, 10)}..., using config fallback`,
+                error
+            );
+            return { tickSize: this.cfg.tickSize, negRisk: this.cfg.negRisk };
+        }
     }
 
     stop(): void {
@@ -679,9 +710,10 @@ export class CopytradeArbBot {
 
         // Place order IMMEDIATELY (await to ensure it's placed within 10ms)
         try {
+            const orderOptions = await this.resolveOrderOptions(tokenID);
             const response = await this.client.createAndPostOrder(
                 limitOrder,
-                { tickSize: this.cfg.tickSize, negRisk: this.cfg.negRisk },
+                orderOptions,
                 OrderType.GTC // Good-Till-Cancel for limit orders
             );
 
@@ -912,10 +944,11 @@ export class CopytradeArbBot {
         };
 
         try {
+            const orderOptions = await this.resolveOrderOptions(oppositeTokenId);
             // Place order IMMEDIATELY (await to ensure it's placed within 50ms of first order)
             const response = await this.client.createAndPostOrder(
                 limitOrder,
-                { tickSize: this.cfg.tickSize, negRisk: this.cfg.negRisk },
+                orderOptions,
                 OrderType.GTC // Good-Till-Cancel for limit orders
             );
             

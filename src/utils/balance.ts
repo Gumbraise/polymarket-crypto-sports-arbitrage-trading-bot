@@ -1,6 +1,11 @@
 import { ClobClient, AssetType, type OpenOrder } from "@polymarket/clob-client";
 import { logger } from "./logger";
 import { config } from "../config";
+import {
+    getBalanceAllowanceStrict,
+    getOpenOrdersStrict,
+    updateBalanceAllowanceStrict,
+} from "../providers/clobclient";
 
 /**
  * Calculate available balance for placing orders
@@ -13,7 +18,7 @@ export async function getAvailableBalance(
 ): Promise<number> {
     try {
         // Get total balance
-        const balanceResponse = await client.getBalanceAllowance({
+        const balanceResponse = await getBalanceAllowanceStrict(client, {
             asset_type: assetType,
             ...(tokenId && { token_id: tokenId }),
         });
@@ -21,7 +26,8 @@ export async function getAvailableBalance(
         const totalBalance = parseFloat(balanceResponse.balance || "0");
 
         // Get open orders for this asset
-        const openOrders = await client.getOpenOrders(
+        const openOrders = await getOpenOrdersStrict(
+            client,
             tokenId ? { asset_id: tokenId } : undefined
         );
 
@@ -67,7 +73,7 @@ export async function getAvailableBalance(
  */
 export async function displayWalletBalance(client: ClobClient): Promise<{ balance: number; allowance: number }> {
     try {
-        const balanceResponse = await client.getBalanceAllowance({
+        const balanceResponse = await getBalanceAllowanceStrict(client, {
             asset_type: AssetType.COLLATERAL,
         });
 
@@ -102,7 +108,7 @@ export async function validateBuyOrderBalance(
 ): Promise<{ valid: boolean; available: number; required: number; balance?: number; allowance?: number }> {
     try {
         // Get balance and allowance details
-        const balanceResponse = await client.getBalanceAllowance({
+        const balanceResponse = await getBalanceAllowanceStrict(client, {
             asset_type: AssetType.COLLATERAL,
         });
 
@@ -174,12 +180,12 @@ export async function waitForMinimumUsdcBalance(
         try {
             // Best effort: ensure CLOB state is up-to-date with on-chain balance/allowance.
             try {
-                await client.updateBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+                await updateBalanceAllowanceStrict(client, { asset_type: AssetType.COLLATERAL });
             } catch {
                 // ignore - we'll still query current CLOB view below
             }
 
-            const balanceResponse = await client.getBalanceAllowance({
+            const balanceResponse = await getBalanceAllowanceStrict(client, {
                 asset_type: AssetType.COLLATERAL,
             });
 

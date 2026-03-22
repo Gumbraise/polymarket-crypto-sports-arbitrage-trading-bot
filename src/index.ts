@@ -1,7 +1,7 @@
 import { validatePrivateKey } from "./security/validatePrivateKey";
 import { createCredential, isServerSignatureMode } from "./security/createCredential";
 import { approveUSDCAllowance, updateClobBalanceAllowance } from "./security/allowance";
-import { getClobClient } from "./providers/clobclient";
+import { getBalanceAllowanceStrict, getClobClient } from "./providers/clobclient";
 import { waitForMinimumUsdcBalance } from "./utils/balance";
 import { config } from "./config";
 import { logger } from "./utils/logger";
@@ -82,7 +82,7 @@ async function main() {
             `Proxy wallet mode enabled. Checking CLOB balance/allowance for funder ${config.proxyWalletAddress}...`
         );
 
-        const balanceAllowance = await clobClient.getBalanceAllowance({
+        const balanceAllowance = await getBalanceAllowanceStrict(clobClient, {
             asset_type: AssetType.COLLATERAL,
         });
 

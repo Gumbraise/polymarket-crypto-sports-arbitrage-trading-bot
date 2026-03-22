@@ -1,6 +1,12 @@
 import { readFileSync, existsSync } from "fs";
 import { Chain, ClobClient } from "@polymarket/clob-client";
 import type { ApiKeyCreds } from "@polymarket/clob-client";
+import type {
+    BalanceAllowanceParams,
+    BalanceAllowanceResponse,
+    OpenOrderParams,
+    OpenOrdersResponse,
+} from "@polymarket/clob-client";
 import { Wallet } from "@ethersproject/wallet";
 import { config } from "../config";
 import {
@@ -13,6 +19,36 @@ import {
 // Cache for ClobClient instance to avoid repeated initialization
 let cachedClient: ClobClient | null = null;
 let cachedConfig: { chainId: number; host: string } | null = null;
+
+type ClobErrorResponse = {
+    error: unknown;
+    status?: number;
+};
+
+function isClobErrorResponse(value: unknown): value is ClobErrorResponse {
+    return typeof value === "object" && value !== null && "error" in value;
+}
+
+function formatClobError(error: unknown): string {
+    if (typeof error === "string") return error;
+    if (error instanceof Error) return error.message;
+    return JSON.stringify(error);
+}
+
+function assertClobSuccess<T>(value: T | ClobErrorResponse, action: string): T {
+    if (isClobErrorResponse(value)) {
+        const status = typeof value.status === "number" ? ` (HTTP ${value.status})` : "";
+        const baseMessage = `${action} failed${status}: ${formatClobError(value.error)}`;
+        if (value.status === 401) {
+            throw new Error(
+                `${baseMessage}. Verify that PRIVATE_KEY matches the account that owns ` +
+                `CLOB_API_KEY/CLOB_SECRET/CLOB_PASSPHRASE, and that proxy mode uses the correct funder address.`
+            );
+        }
+        throw new Error(baseMessage);
+    }
+    return value;
+}
 
 /**
  * Resolve API key credentials depending on SIGNATURE_METHOD.
@@ -66,8 +102,11 @@ export async function getClobClient(): Promise<ClobClient> {
         passphrase: creds.passphrase,
     };
 
-    // Signature type: 0 = EOA (browser/MetaMask), 2 = proxy/smart wallet.
-    const signatureType = config.useProxyWallet ? 2 : 0;
+    // Signature type:
+    // 0 = EOA
+    // 1 = Polymarket proxy wallet/profile address
+    // 2 = Polymarket Gnosis Safe
+    const signatureType = config.useProxyWallet ? 1 : 0;
     const funderAddress = config.useProxyWallet ? config.proxyWalletAddress : undefined;
 
     // Create and cache client
@@ -83,4 +122,28 @@ export async function getClobClient(): Promise<ClobClient> {
 export function clearClobClientCache(): void {
     cachedClient = null;
     cachedConfig = null;
+}
+
+export async function getBalanceAllowanceStrict(
+    client: ClobClient,
+    params: BalanceAllowanceParams
+): Promise<BalanceAllowanceResponse> {
+    const response = await client.getBalanceAllowance(params);
+    return assertClobSuccess(response, "CLOB getBalanceAllowance");
+}
+
+export async function updateBalanceAllowanceStrict(
+    client: ClobClient,
+    params: BalanceAllowanceParams
+): Promise<void> {
+    const response = await client.updateBalanceAllowance(params);
+    assertClobSuccess(response as void | ClobErrorResponse, "CLOB updateBalanceAllowance");
+}
+
+export async function getOpenOrdersStrict(
+    client: ClobClient,
+    params?: OpenOrderParams
+): Promise<OpenOrdersResponse> {
+    const response = await client.getOpenOrders(params);
+    return assertClobSuccess(response, "CLOB getOpenOrders");
 }

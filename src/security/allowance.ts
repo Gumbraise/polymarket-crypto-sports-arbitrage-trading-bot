@@ -8,6 +8,7 @@ import { Chain, AssetType, ClobClient } from "@polymarket/clob-client";
 import { getContractConfig } from "@polymarket/clob-client";
 import { logger } from "../utils/logger";
 import { config } from "../config";
+import { updateBalanceAllowanceStrict } from "../providers/clobclient";
 
 // Minimal USDC ERC20 ABI
 const USDC_ABI = [
@@ -225,7 +226,7 @@ export async function approveUSDCAllowance(): Promise<void> {
 export async function updateClobBalanceAllowance(client: ClobClient): Promise<void> {
     try {
         logger.info("Updating CLOB API balance allowance for USDC...");
-        await client.updateBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+        await updateBalanceAllowanceStrict(client, { asset_type: AssetType.COLLATERAL });
         logger.info("✅ CLOB API balance allowance updated for USDC");
     } catch (error) {
         logger.error(`Failed to update CLOB balance allowance: ${error instanceof Error ? error.message : String(error)}`);

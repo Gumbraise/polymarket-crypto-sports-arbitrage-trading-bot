@@ -538,7 +538,7 @@ export class CopytradeArbBot {
             logger.info(`🔮 PREDICT [POLE]: ${prediction.predictedPrice.toFixed(4)} (current: ${upAsk.toFixed(4)}) | Direction: ${prediction.direction.toUpperCase()} | Confidence: ${(prediction.confidence * 100).toFixed(1)}% | Signal: ${prediction.signal} | Momentum: ${prediction.features.momentum.toFixed(3)} | Vol: ${prediction.features.volatility.toFixed(3)} | Trend: ${prediction.features.trend.toFixed(3)}`);
 
             // Execute prediction-based trading strategy
-            this.executePredictionTrade(market, slug, prediction, upAsk, downAsk, currentTokenIds, state, k, row);
+            await this.executePredictionTrade(market, slug, prediction, upAsk, downAsk, currentTokenIds, state, k, row);
 
             // Log accuracy stats periodically (every 25 predictions, and at milestones)
             const stats = predictor.getAccuracyStats();
@@ -692,25 +692,32 @@ export class CopytradeArbBot {
         upIdx: number,
         downIdx: number
     ): Promise<boolean> {
-        const limitPrice = askPrice+0.01; // Use askPrice directly for limit order
-
         const estimatedShares = size;
-
-        const limitOrder: UserOrder = {
-            tokenID,
-            side: Side.BUY,
-            price: limitPrice,
-            size: size,
-        };
-
-        const orderAmount = limitPrice * size;
-
-        // Log buy
-        logger.info(`BUY: ${leg} ~${estimatedShares} shares @ limit ${limitPrice.toFixed(4)} (${orderAmount.toFixed(2)} USDC)`);
 
         // Place order IMMEDIATELY (await to ensure it's placed within 10ms)
         try {
             const orderOptions = await this.resolveOrderOptions(tokenID);
+            const tickSize = Number.parseFloat(orderOptions.tickSize);
+            const maxOrderPrice = 1 - tickSize;
+            const limitPrice = askPrice + 0.01;
+
+            if (!Number.isFinite(limitPrice) || limitPrice <= 0 || limitPrice > maxOrderPrice) {
+                logger.error(
+                    `BUY skipped for ${leg}: computed price ${limitPrice.toFixed(4)} is outside valid range 0 < price <= ${maxOrderPrice.toFixed(4)}`
+                );
+                return false;
+            }
+
+            const limitOrder: UserOrder = {
+                tokenID,
+                side: Side.BUY,
+                price: limitPrice,
+                size: size,
+            };
+
+            const orderAmount = limitPrice * size;
+            logger.info(`BUY: ${leg} ~${estimatedShares} shares @ limit ${limitPrice.toFixed(4)} (${orderAmount.toFixed(2)} USDC)`);
+
             const response = await this.client.createAndPostOrder(
                 limitOrder,
                 orderOptions,
@@ -736,7 +743,7 @@ export class CopytradeArbBot {
      * When prediction says UP → buy UP token, then at next prediction buy DOWN token
      * When prediction says DOWN → buy DOWN token, then at next prediction buy UP token
      */
-    private executePredictionTrade(
+    private async executePredictionTrade(
         market: string,
         slug: string,
         prediction: PricePrediction,
@@ -746,7 +753,7 @@ export class CopytradeArbBot {
         state: SimpleStateFile,
         k: string,
         row: SimpleStateRow
-    ): void {
+    ): Promise<void> {
         // Initialize prediction score for this market/slug if not exists
         const scoreKey = `${market}-${slug}`;
         if (!this.predictionScores.has(scoreKey)) {
@@ -786,9 +793,6 @@ export class CopytradeArbBot {
         if (prediction.signal === "HOLD") {
             return; // Skip silently to reduce log noise
         }
-
-        // Only increment totalPredictions when we actually make a trade
-        score.totalPredictions++;
 
         // Determine which token to buy based on prediction direction only
         // Always follow prediction direction - no alternating logic
@@ -837,21 +841,11 @@ export class CopytradeArbBot {
             }
         }
 
-        // Increment count for the side we're buying ONLY (before calling buySharesWithRetry to prevent race conditions)
-        if (buyToken === "UP") {
-            tokenCounts.upTokenCount++;
-            score.upTokenCount++;
-        } else {
-            tokenCounts.downTokenCount++;
-            score.downTokenCount++;
-        }
-
         // Execute the buy
         const buyCost = buyPrice * this.cfg.sharesPerSide;
         logger.info(`🎯 FIRST-SIDE Trade: ${buyToken} @ ${buyPrice.toFixed(4)} (${buyCost.toFixed(2)} USDC) | UP ${tokenCounts.upTokenCount}/${this.MAX_BUY_COUNTS_PER_SIDE}, DOWN ${tokenCounts.downTokenCount}/${this.MAX_BUY_COUNTS_PER_SIDE} | Limit: ${this.MAX_BUY_COUNTS_PER_SIDE} per side`);
 
-        // Place first-side order (fire-and-forget, don't wait for response)
-        this.buySharesWithRetry(
+        const firstSidePlaced = await this.buySharesWithRetry(
             buyToken === "UP" ? "YES" : "NO",
             tokenId,
             buyPrice,
@@ -866,10 +860,24 @@ export class CopytradeArbBot {
             tokenIds.downIdx
         );
 
+        if (!firstSidePlaced) {
+            return;
+        }
+
+        score.totalPredictions++;
+
+        if (buyToken === "UP") {
+            tokenCounts.upTokenCount++;
+            score.upTokenCount++;
+        } else {
+            tokenCounts.downTokenCount++;
+            score.downTokenCount++;
+        }
+
         // Place second-side limit order IMMEDIATELY (within 50ms) without waiting for first order response
         // This ensures both orders are placed almost simultaneously for better execution
 
-        this.placeSecondSideLimitOrder(
+        void this.placeSecondSideLimitOrder(
             buyToken,
             buyPrice,
             tokenIds,
@@ -945,6 +953,12 @@ export class CopytradeArbBot {
 
         try {
             const orderOptions = await this.resolveOrderOptions(oppositeTokenId);
+            const tickSize = Number.parseFloat(orderOptions.tickSize);
+            const maxOrderPrice = 1 - tickSize;
+            if (!Number.isFinite(limitPrice) || limitPrice <= 0 || limitPrice > maxOrderPrice) {
+                logger.error(`⚠️  Invalid limit price calculated: ${limitPrice.toFixed(4)} (allowed max ${maxOrderPrice.toFixed(4)})`);
+                return;
+            }
             // Place order IMMEDIATELY (await to ensure it's placed within 50ms of first order)
             const response = await this.client.createAndPostOrder(
                 limitOrder,

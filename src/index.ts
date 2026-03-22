@@ -86,8 +86,8 @@ async function main() {
             asset_type: AssetType.COLLATERAL,
         });
 
-        const proxyBalance = Number(balanceAllowance?.balance ?? 0);
-        const proxyAllowance = Number(balanceAllowance?.allowance ?? 0);
+        const proxyBalance = Number(balanceAllowance?.balance ?? 0) / 10 ** 6;
+        const proxyAllowance = Number(balanceAllowance?.allowance ?? 0) / 10 ** 6;
 
         logger.info(
             `Proxy wallet CLOB state -> balance=${proxyBalance}, allowance=${proxyAllowance}`

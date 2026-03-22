@@ -25,6 +25,16 @@ type ClobErrorResponse = {
     status?: number;
 };
 
+type RawBalanceAllowanceResponse = BalanceAllowanceResponse & {
+    allowance?: string;
+    allowances?: Record<string, string>;
+};
+
+export type NormalizedBalanceAllowanceResponse = BalanceAllowanceResponse & {
+    allowance: string;
+    allowances?: Record<string, string>;
+};
+
 function isClobErrorResponse(value: unknown): value is ClobErrorResponse {
     return typeof value === "object" && value !== null && "error" in value;
 }
@@ -59,10 +69,32 @@ function resolveSignatureType(): number {
         return 0;
     }
 
-    // Official Polymarket docs distinguish:
-    // 1 = POLY_PROXY for Magic/email login
-    // 2 = GNOSIS_SAFE for browser-wallet based Polymarket accounts (most common)
-    return 2;
+    // This project targets a Polymarket proxy/profile wallet funded via a separate signer.
+    // Empirically, the matching CLOB balance/allowance endpoint for this account uses POLY_PROXY.
+    return 1;
+}
+
+function normalizeAllowanceValue(value: RawBalanceAllowanceResponse): string {
+    if (typeof value.allowance === "string") {
+        return value.allowance;
+    }
+
+    if (value.allowances && Object.keys(value.allowances).length > 0) {
+        const maxAllowance = Object.values(value.allowances).reduce<bigint>(
+            (currentMax, entry) => {
+                try {
+                    const next = BigInt(entry);
+                    return next > currentMax ? next : currentMax;
+                } catch {
+                    return currentMax;
+                }
+            },
+            0n
+        );
+        return maxAllowance.toString();
+    }
+
+    return "0";
 }
 
 /**
@@ -138,9 +170,16 @@ export function clearClobClientCache(): void {
 export async function getBalanceAllowanceStrict(
     client: ClobClient,
     params: BalanceAllowanceParams
-): Promise<BalanceAllowanceResponse> {
+): Promise<NormalizedBalanceAllowanceResponse> {
     const response = await client.getBalanceAllowance(params);
-    return assertClobSuccess(response, "CLOB getBalanceAllowance");
+    const normalized = assertClobSuccess(
+        response as RawBalanceAllowanceResponse | ClobErrorResponse,
+        "CLOB getBalanceAllowance"
+    );
+    return {
+        ...normalized,
+        allowance: normalizeAllowanceValue(normalized),
+    };
 }
 
 export async function updateBalanceAllowanceStrict(

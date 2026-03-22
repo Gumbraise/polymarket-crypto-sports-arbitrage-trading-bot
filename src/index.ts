@@ -1,10 +1,10 @@
 import { validatePrivateKey } from "./security/validatePrivateKey";
-import { createCredential } from "./security/createCredential";
+import { createCredential, isServerSignatureMode } from "./security/createCredential";
 import { approveUSDCAllowance, updateClobBalanceAllowance } from "./security/allowance";
 import { getClobClient } from "./providers/clobclient";
 import { waitForMinimumUsdcBalance } from "./utils/balance";
 import { config } from "./config";
-import { logger } from "pretty-ts-logger";
+import { logger } from "./utils/logger";
 
 import { CopytradeArbBot } from "./order-builder/copytrade";
 import { setupConsoleFileLogging } from "./utils/console-file";
@@ -44,10 +44,15 @@ async function main() {
 
     validatePrivateKey();
 
-    // Create credentials if they don't exist
-    const credential = await createCredential();
-    if (credential) {
-        logger.info("Credentials ready");
+    if (isServerSignatureMode()) {
+        logger.info("Using CLOB server credentials (SIGNATURE_METHOD=server)");
+    } else {
+        logger.info("Using wallet-derived credentials (SIGNATURE_METHOD=wallet)");
+        // Create credentials if they don't exist
+        const credential = await createCredential();
+        if (credential) {
+            logger.info("Credentials ready");
+        }
     }
 
     const clobClient = await getClobClient();

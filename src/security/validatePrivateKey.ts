@@ -1,6 +1,6 @@
 import { Wallet } from "@ethersproject/wallet";
 import { config } from "../config";
-import { logger } from "pretty-ts-logger";
+import { logger } from "../utils/logger";
 
 /**
  * Validates that PRIVATE_KEY is set and is a valid Ethereum private key.

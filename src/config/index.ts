@@ -52,6 +52,17 @@ export const config = {
     privateKey: envString("PRIVATE_KEY"),
     requirePrivateKey: () => requireEnv("PRIVATE_KEY"),
 
+    /**
+     * Signature method: "wallet" (default) derives API keys via wallet signature (MetaMask/EIP-712).
+     * "server" uses pre-generated CLOB API keys provided via CLOB_API_KEY / CLOB_SECRET / CLOB_PASSPHRASE.
+     */
+    signatureMethod: (envString("SIGNATURE_METHOD", "wallet")!.toLowerCase()) as "wallet" | "server",
+
+    /** Pre-generated CLOB API credentials (only used when SIGNATURE_METHOD=server) */
+    clobApiKey: envString("CLOB_API_KEY"),
+    clobSecret: envString("CLOB_SECRET"),
+    clobPassphrase: envString("CLOB_PASSPHRASE"),
+
     /** Use Polymarket proxy/smart wallet (set true only if you trade via proxy; default EOA) */
     useProxyWallet: envBool("USE_PROXY_WALLET", false),
     /** Proxy/Polymarket profile address (where USDC is held); only used when USE_PROXY_WALLET=true */

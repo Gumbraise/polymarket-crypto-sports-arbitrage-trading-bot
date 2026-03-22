@@ -16,10 +16,42 @@ export function hasCredentialFile(): boolean {
 }
 
 /**
+ * Return true when the bot is configured to use pre-generated CLOB server credentials
+ * instead of wallet-derived ones.
+ */
+export function isServerSignatureMode(): boolean {
+    return config.signatureMethod === "server";
+}
+
+/**
+ * Read CLOB API credentials from env vars (SIGNATURE_METHOD=server).
+ * Throws if any of the three required vars is missing.
+ */
+export function getServerCredentials(): ApiKeyCreds {
+    const key = config.clobApiKey;
+    const secret = config.clobSecret;
+    const passphrase = config.clobPassphrase;
+
+    if (!key || !secret || !passphrase) {
+        throw new Error(
+            "SIGNATURE_METHOD=server requires CLOB_API_KEY, CLOB_SECRET, and CLOB_PASSPHRASE to be set in .env"
+        );
+    }
+
+    return { key, secret, passphrase };
+}
+
+/**
  * Create API key credentials via createOrDeriveApiKey and save to src/data/credential.json.
  * Ensures src/data directory exists before writing.
+ * Only used when SIGNATURE_METHOD=wallet (default).
  */
 export async function createCredential(): Promise<ApiKeyCreds | null> {
+    if (isServerSignatureMode()) {
+        logger.info("SIGNATURE_METHOD=server — skipping wallet-based credential creation");
+        return getServerCredentials();
+    }
+
     const privateKey = config.privateKey;
     if (!privateKey) return (logger.error("PRIVATE_KEY not found"), null);
 
@@ -52,10 +84,20 @@ export async function saveCredential(credential: ApiKeyCreds): Promise<void> {
 }
 
 /**
- * Ensure credential file exists: create via createOrDeriveApiKey if missing.
- * Returns true if credentials are available (existing or newly created), false otherwise.
+ * Ensure credentials are available.
+ * - Server mode: validates that env vars are present (no file needed).
+ * - Wallet mode: creates credential file via wallet signature if missing.
  */
 export async function ensureCredential(): Promise<boolean> {
+    if (isServerSignatureMode()) {
+        try {
+            getServerCredentials();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     if (hasCredentialFile()) return true;
     const credential = await createCredential();
     return credential !== null;

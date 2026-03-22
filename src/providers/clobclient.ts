@@ -19,6 +19,8 @@ import {
 // Cache for ClobClient instance to avoid repeated initialization
 let cachedClient: ClobClient | null = null;
 let cachedConfig: { chainId: number; host: string } | null = null;
+let cachedOrderClient: ClobClient | null = null;
+let cachedOrderConfig: { chainId: number; host: string; signatureType: number } | null = null;
 
 type ClobErrorResponse = {
     error: unknown;
@@ -74,6 +76,13 @@ function resolveSignatureType(): number {
     return 1;
 }
 
+function resolveOrderSignatureType(): number {
+    if (config.clobOrderSignatureType >= 0) {
+        return config.clobOrderSignatureType;
+    }
+    return resolveSignatureType();
+}
+
 function normalizeAllowanceValue(value: RawBalanceAllowanceResponse): string {
     if (typeof value.allowance === "string") {
         return value.allowance;
@@ -123,16 +132,9 @@ async function resolveCredentials(): Promise<ApiKeyCreds> {
  * Initialize ClobClient from credentials (cached singleton).
  * Supports both wallet-derived and server-provided credentials.
  */
-export async function getClobClient(): Promise<ClobClient> {
+async function buildClient(signatureType: number): Promise<ClobClient> {
     const chainId = (config.chainId || Chain.POLYGON) as Chain;
     const host = config.clobApiUrl;
-
-    // Return cached client if config hasn't changed
-    if (cachedClient && cachedConfig &&
-        cachedConfig.chainId === chainId &&
-        cachedConfig.host === host) {
-        return cachedClient;
-    }
 
     const creds = await resolveCredentials();
 
@@ -149,14 +151,51 @@ export async function getClobClient(): Promise<ClobClient> {
         passphrase: creds.passphrase,
     };
 
-    const signatureType = resolveSignatureType();
     const funderAddress = config.useProxyWallet ? config.proxyWalletAddress : undefined;
+    return new ClobClient(host, chainId, wallet, apiKeyCreds, signatureType, funderAddress);
+}
 
-    // Create and cache client
-    cachedClient = new ClobClient(host, chainId, wallet, apiKeyCreds, signatureType, funderAddress);
+/**
+ * Initialize ClobClient from credentials (cached singleton).
+ * Supports both wallet-derived and server-provided credentials.
+ */
+export async function getClobClient(): Promise<ClobClient> {
+    const chainId = (config.chainId || Chain.POLYGON) as Chain;
+    const host = config.clobApiUrl;
+    const signatureType = resolveSignatureType();
+
+    if (
+        cachedClient &&
+        cachedConfig &&
+        cachedConfig.chainId === chainId &&
+        cachedConfig.host === host
+    ) {
+        return cachedClient;
+    }
+
+    cachedClient = await buildClient(signatureType);
     cachedConfig = { chainId, host };
-
     return cachedClient;
+}
+
+export async function getClobOrderClient(): Promise<ClobClient> {
+    const chainId = (config.chainId || Chain.POLYGON) as Chain;
+    const host = config.clobApiUrl;
+    const signatureType = resolveOrderSignatureType();
+
+    if (
+        cachedOrderClient &&
+        cachedOrderConfig &&
+        cachedOrderConfig.chainId === chainId &&
+        cachedOrderConfig.host === host &&
+        cachedOrderConfig.signatureType === signatureType
+    ) {
+        return cachedOrderClient;
+    }
+
+    cachedOrderClient = await buildClient(signatureType);
+    cachedOrderConfig = { chainId, host, signatureType };
+    return cachedOrderClient;
 }
 
 /**
@@ -165,6 +204,8 @@ export async function getClobClient(): Promise<ClobClient> {
 export function clearClobClientCache(): void {
     cachedClient = null;
     cachedConfig = null;
+    cachedOrderClient = null;
+    cachedOrderConfig = null;
 }
 
 export async function getBalanceAllowanceStrict(

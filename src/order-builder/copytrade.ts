@@ -55,6 +55,11 @@ async function getClobClient() {
     return await getClobClient();
 }
 
+async function getClobOrderClient() {
+    const { getClobOrderClient } = await import("../providers/clobclient");
+    return await getClobOrderClient();
+}
+
 type SimpleStateRow = {
     previousUpPrice: number | null; // Previous cycle's UP token price
     lastUpdatedIso: string;
@@ -191,7 +196,7 @@ export class CopytradeArbBot {
 
     private initializationPromise: Promise<void> | null = null;
 
-    constructor(private client: ClobClient, private cfg: SimpleConfig) {
+    constructor(private client: ClobClient, private orderClient: ClobClient, private cfg: SimpleConfig) {
         // Initialize MAX_BUY_COUNTS_PER_SIDE from config (treat 0 or less as "no cap")
         const rawMax = cfg.maxBuyCountsPerSide ?? config.copytrade.maxBuyCountsPerSide;
         this.MAX_BUY_COUNTS_PER_SIDE = typeof rawMax === "number" ? rawMax : 0;
@@ -200,11 +205,12 @@ export class CopytradeArbBot {
     }
 
     static async fromEnv(client: ClobClient): Promise<CopytradeArbBot> {
+        const orderClient = await getClobOrderClient();
         const {
             markets, sharesPerSide, tickSize, negRisk,
             priceBuffer, fireAndForget, minBalanceUsdc, maxBuyCountsPerSide
         } = config.copytrade;
-        const bot = new CopytradeArbBot(client, {
+        const bot = new CopytradeArbBot(client, orderClient, {
             markets, sharesPerSide, tickSize: tickSize as CreateOrderOptions["tickSize"],
             negRisk, priceBuffer, fireAndForget, minBalanceUsdc, maxBuyCountsPerSide,
         });
@@ -718,7 +724,7 @@ export class CopytradeArbBot {
             const orderAmount = limitPrice * size;
             logger.info(`BUY: ${leg} ~${estimatedShares} shares @ limit ${limitPrice.toFixed(4)} (${orderAmount.toFixed(2)} USDC)`);
 
-            const response = await this.client.createAndPostOrder(
+            const response = await this.orderClient.createAndPostOrder(
                 limitOrder,
                 orderOptions,
                 OrderType.GTC // Good-Till-Cancel for limit orders
@@ -960,7 +966,7 @@ export class CopytradeArbBot {
                 return;
             }
             // Place order IMMEDIATELY (await to ensure it's placed within 50ms of first order)
-            const response = await this.client.createAndPostOrder(
+            const response = await this.orderClient.createAndPostOrder(
                 limitOrder,
                 orderOptions,
                 OrderType.GTC // Good-Till-Cancel for limit orders

@@ -74,6 +74,11 @@ export const config = {
      * 2 = GNOSIS_SAFE (browser wallet / most common Polymarket account type)
      */
     clobSignatureType: envNumber("CLOB_SIGNATURE_TYPE", -1),
+    /**
+     * Optional separate signature type for signed order payloads.
+     * Use this only if auth/balance works with one type, but order signatures require another.
+     */
+    clobOrderSignatureType: envNumber("CLOB_ORDER_SIGNATURE_TYPE", -1),
 
     /** RPC configuration (used for on-chain calls like allowance/balance/redeem). */
     rpcUrl: envString("RPC_URL"),

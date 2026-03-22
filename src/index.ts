@@ -71,7 +71,7 @@ async function main() {
         logger.info("Syncing allowances with CLOB API...");
         await updateClobBalanceAllowance(clobClient);
     } catch (error) {
-        logger.info("Failed to approve USDC allowances", error);
+        logger.error("Failed to approve USDC allowances", error);
         logger.info("Continuing without allowances - orders may fail");
     }
 
@@ -153,6 +153,6 @@ async function main() {
 }
 
 main().catch((error) => {
-    logger.info("Fatal error", error);
+    logger.error("Fatal error", error);
     process.exit(1);
 });

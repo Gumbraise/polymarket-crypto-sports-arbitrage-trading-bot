@@ -50,6 +50,21 @@ function assertClobSuccess<T>(value: T | ClobErrorResponse, action: string): T {
     return value;
 }
 
+function resolveSignatureType(): number {
+    if (config.clobSignatureType >= 0) {
+        return config.clobSignatureType;
+    }
+
+    if (!config.useProxyWallet) {
+        return 0;
+    }
+
+    // Official Polymarket docs distinguish:
+    // 1 = POLY_PROXY for Magic/email login
+    // 2 = GNOSIS_SAFE for browser-wallet based Polymarket accounts (most common)
+    return 2;
+}
+
 /**
  * Resolve API key credentials depending on SIGNATURE_METHOD.
  * - "server": reads CLOB_API_KEY / CLOB_SECRET / CLOB_PASSPHRASE from env
@@ -102,11 +117,7 @@ export async function getClobClient(): Promise<ClobClient> {
         passphrase: creds.passphrase,
     };
 
-    // Signature type:
-    // 0 = EOA
-    // 1 = Polymarket proxy wallet/profile address
-    // 2 = Polymarket Gnosis Safe
-    const signatureType = config.useProxyWallet ? 1 : 0;
+    const signatureType = resolveSignatureType();
     const funderAddress = config.useProxyWallet ? config.proxyWalletAddress : undefined;
 
     // Create and cache client

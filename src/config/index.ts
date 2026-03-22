@@ -67,6 +67,13 @@ export const config = {
     useProxyWallet: envBool("USE_PROXY_WALLET", false),
     /** Proxy/Polymarket profile address (where USDC is held); only used when USE_PROXY_WALLET=true */
     proxyWalletAddress: envString("PROXY_WALLET_ADDRESS", "")!,
+    /**
+     * CLOB signature type override.
+     * 0 = EOA
+     * 1 = POLY_PROXY (Magic/email login)
+     * 2 = GNOSIS_SAFE (browser wallet / most common Polymarket account type)
+     */
+    clobSignatureType: envNumber("CLOB_SIGNATURE_TYPE", -1),
 
     /** RPC configuration (used for on-chain calls like allowance/balance/redeem). */
     rpcUrl: envString("RPC_URL"),
